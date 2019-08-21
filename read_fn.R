@@ -1,0 +1,204 @@
+### A: Lucas Nathe
+### D: 8/18/2019
+### P: 
+#sets
+#i)download disclosure and transmittal files
+#ii)read in cra disclosure data from .dat.zip
+#iii) read in cra transmittal files .dat.zip
+#iv) merge them together
+setwd('/href/research3/m1lmn03/ba/distance_lending/cra_public/read_fn')
+#overview
+# create a function that you feed years and a key word for loan type
+# that returns a set of disclsoure data for that type of record_id andyears
+
+
+#### helper functions ####
+get_widths <- function(year) {
+  #short_year <- [1] %% 100L
+  
+  if (year == "96") {
+    ret_val <- c(4, 10, 1, 4, 1, 1, 2, 3, 4, 4,
+                 1, 1, 1, 3, 3, 6, 8, 6, 8, 6,
+                 8, 6, 8, 6, 8)
+  } else if (year %in% (c("97","98","99","00","01","03"))) {
+    ret_val <- c(5, 10, 1, 4, 1, 1, 2, 3, 4, 4,
+                 1, 1, 1, 3, 3, 6, 8, 6, 8, 6,
+                 8, 6, 8, 6, 8)
+  } else {
+    ret_val <- c(5, 10, 1, 4, 1, 1, 2, 3, 5, 4,
+                 1, 1, 1, 3, 3, 10, 10, 10, 10, 10,
+                 10, 10, 10, 10, 10)
+  }
+  
+  ret_val
+}
+factor_agency <- function(x) {
+  x <- as.character(x)
+  
+  factor(x,
+         levels = c('1', '2', '3', '4'),
+         labels = c('OCC', 'FRB', 'FDIC', 'OTS'))
+}
+
+
+
+#select years
+years<-c(1998,1999)
+years<list(years)
+years<-c(2015,2016)
+years<- as.character(years)
+loan_type<-"D11"
+
+read_data<- function(years,loan_type){
+  #convert years to format of urls 
+  if(sum(nchar(years,type = "width")==4)==length(years)){
+    years<- substr(years,3,4)
+  }
+  if(sum(nchar(years,type = "width")==2)!=length(years)){
+    print("You need to 2 or 4 digits years!")
+  }
+  loan_type<-toupper(loan_type)
+  
+  if(!loan_type %in% c("D3","D4","D5","D6","D11","D12","D21","D22")){
+    print("You need to enter the proper loan type identifier!")
+    loan_var_name<-loan_type
+    stri_sub(loan_var_name, 3, 2)
+    stri_sub(loan_var_name, 3,2) <- "-"
+  }  
+  # set something to convert these codes to the codes in the dat file 
+### download the data
+root<-"https://www.ffiec.gov/CRA/xls/"
+dest<-getwd()
+y<-1
+#loop through years
+for(y in 1:length(years)){
+    download.file(paste0(root,years[y],"exp_discl.zip"),
+                  destfile = paste0(dest,"/discl",
+                             years[y],".zip"))
+  y<-y+1
+}
+#pull out .dat
+# get all the zip files
+zipF <- list.files(pattern = "*.zip", full.names = TRUE)
+# unzip all your files
+plyr::ldply(.data = zipF, .fun = unzip)
+y<-1
+for(y in 1:length(years)){
+  if(years[y] %in% c("15","16","17","18")){
+    file.rename(paste0("cra20",years[y],"_Discl_",loan_type,".dat"), paste0(years[y],
+                                                                            "exp_discl.dat"))
+    y<-y+1
+  }
+}
+#remove extra files 
+    system("rm cra*.dat")
+#read in dat files    
+dat_name<-list.files(pattern = "*.dat")
+y<-1
+cra_full<- data.frame()
+for(y in 1:length(years)){
+w <- get_widths(years[y]) # Widths by file year
+s <- cumsum(c(1, w))[1:length(w)] # starting point for each variable
+e <- cumsum(w)                    # end point for each variable
+
+
+    in_tbl <- readr::read_lines(dat_name[y],progress = FALSE) %>%
+      tibble::tibble(V1 = .) %>%
+     filter(substr(V1, 1, 4) == loan_var_name)  
+    
+    # keep if IncomeGroup_Total == "0"
+    # replace IncomeGroup_Total = ""
+    # keep if inlist(Report_Level, "040","050","060")
+    # sort Respondent_ID State County Report_Level
+    # quietly by Respondent_ID State County:  gen dup = cond(_N==1,0,_n)
+    # drop if dup>1
+    # replace Report_Level = "040"
+    
+    ret_dt <- mutate(in_tbl,
+                     respondent = as.numeric(substr(V1, s[2], e[2])),
+                     agency = factor_agency(substr(V1, s[3], e[3])),
+                     year = as.numeric(substr(V1, s[4], e[4])),
+                     loan_type = substr(V1, s[5], e[5]),
+                     action = substr(V1, s[6], e[6]),
+                     state = as.numeric(substr(V1, s[7], e[7])),
+                     county = as.numeric(substr(V1, s[8], e[8])),
+                     metro_area = as.numeric(substr(V1, s[9], e[9])),
+                     assessment_area = as.numeric(substr(V1, s[10], e[10])),
+                     partial_county_fl = as.logical(substr(V1, s[11], e[11])),
+                     split_county_fl = as.logical(substr(V1, s[12], e[12])),
+                     population_f = factor(substr(V1, s[13], e[13]),
+                                           levels = c('S', 'L', ' '),
+                                           labels = c('<= 500,000 in population',
+                                                      '>500,000 in population',
+                                                      'Total')),
+                     income_group = factor(as.numeric(substr(V1, s[14], e[14])),
+                                           levels = c(1:15, 101:106),
+                                           labels = c('< 10% of MFI',
+                                                      '10% to 20% of MFI',
+                                                      '20% to 30% of MFI',
+                                                      '30% to 40% of MFI',
+                                                      '40% to 50% of MFI',
+                                                      '50% to 60% of MFI',
+                                                      '60% to 70% of MFI',
+                                                      '70% to 80% of MFI',
+                                                      '80% to 90% of MFI',
+                                                      '90% to 100% of MFI',
+                                                      '100% to 110% of MFI',
+                                                      '110% to 120% of MFI',
+                                                      '>= 120% of MFI',
+                                                      'Unknown MFI',
+                                                      'Unknown Tract',
+                                                      'Low Income',
+                                                      'Moderate Income',
+                                                      'Middle Income',
+                                                      'Upper Income',
+                                                      'Unknown Income',
+                                                      'Unknown Tract')),
+                     report_level = factor(as.numeric(substr(V1, s[15], e[15])),
+                                           levels = c(4, 6, 8, 10, 20, 30, 40, 50, 60),
+                                           labels = c('Total Inside & Outside Assessment Area (AA)',
+                                                      'Total Inside AA',
+                                                      'Total Outside AA',
+                                                      'State Total',
+                                                      'Total Inside AA in State',
+                                                      'Total Outside AA in State',
+                                                      'County Total',
+                                                      'Total Inside AA in County',
+                                                      'Total Outside AA in County')),
+                     num_le100k = as.numeric(substr(V1, s[16], e[16])),
+                     amt_le100k = as.numeric(substr(V1, s[17], e[17])),
+                     num_100to250k = as.numeric(substr(V1, s[18], e[18])),
+                     amt_100to250k = as.numeric(substr(V1, s[19], e[19])),
+                     num_250to1m = as.numeric(substr(V1, s[20], e[20])),
+                     amt_250to1m = as.numeric(substr(V1, s[21], e[21])),
+                     num_sbl = as.numeric(substr(V1, s[22], e[22])),
+                     amt_sbl = as.numeric(substr(V1, s[23], e[23])),
+                     num_affiliate = as.numeric(substr(V1, s[24], e[24])),
+                     amt_affiliate = as.numeric(substr(V1, s[25], e[25]))) 
+    
+    if (years[y] %in% c("96","97","98")){
+      ret_dt<- ret_dt %>% filter(is.na(income_group) & report_level %in%
+                                   c('County Total',
+                                     'Total Inside AA in County',
+                                     'Total Outside AA in County'))
+      ret_dt<- ret_dt[order(ret_dt$respondent,ret_dt$state,ret_dt$county),]
+      #ret_dt<- ret_dt %>% distinct(respondent,state,county) # need to find a way to drop duplicates like stata
+      #ret_dt <- ret_dt[duplicated(ret_dt, by = c("respondent","state","county")),]
+      ret_dt$report_level<- "County Total"
+    }
+    
+    ret_dt<- ret_dt %>% filter(report_level == "County Total")
+    cra_full<- bind_rows(cra_full,ret_dt)
+    y<-y+1
+}
+
+}  
+    
+
+    
+
+
+
+
+
+
