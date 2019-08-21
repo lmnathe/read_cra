@@ -6,11 +6,10 @@
 #ii)read in cra disclosure data from .dat.zip
 #iii) read in cra transmittal files .dat.zip
 #iv) merge them together
-setwd('/href/research3/m1lmn03/ba/distance_lending/cra_public/read_fn')
 #overview
 # create a function that you feed years and a key word for loan type
 # that returns a set of disclsoure data for that type of record_id andyears
-
+setwd('/Users/prnathe/Documents/github_data/')
 
 #### helper functions ####
 get_widths <- function(year) {
@@ -44,8 +43,8 @@ factor_agency <- function(x) {
 
 #select years
 years<-c(1998,1999)
-years<list(years)
-years<-c(2015,2016)
+#years<list(years)
+years<-c(1996,2015,2016)
 years<- as.character(years)
 loan_type<-"D11"
 
@@ -77,21 +76,27 @@ for(y in 1:length(years)){
                              years[y],".zip"))
   y<-y+1
 }
-#pull out .dat
-# get all the zip files
-zipF <- list.files(pattern = "*.zip", full.names = TRUE)
-# unzip all your files
-plyr::ldply(.data = zipF, .fun = unzip)
 y<-1
 for(y in 1:length(years)){
-  if(years[y] %in% c("15","16","17","18")){
+  if(years[y] %in% c("16","17","18")){
+    unzip(zipfile = paste0("discl",years[y],".zip"))
     file.rename(paste0("cra20",years[y],"_Discl_",loan_type,".dat"), paste0(years[y],
                                                                             "exp_discl.dat"))
+  } else {
+      unzip(zipfile = paste0("discl",years[y],".zip"))
+      file_list<- list.files(pattern = "^exp_discl.dat")
+      #file.rename("exp_discl.dat", paste0(years[y], "exp_discl.dat"))
+      file.rename(from = file_list[1], paste0(years[y], "exp_discl.dat"))
+      file.remove("exp_discl.dat")
+    }
     y<-y+1
-  }
 }
-#remove extra files 
-    system("rm cra*.dat")
+file_keep<- list.files(pattern = "..exp_discl.dat" )
+file_all<- list.files(pattern = "*.dat")
+file_remove<-setdiff(x = file_all, y = file_keep)
+file.remove(file_remove)
+}
+
 #read in dat files    
 dat_name<-list.files(pattern = "*.dat")
 y<-1
