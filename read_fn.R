@@ -10,7 +10,10 @@
 # create a function that you feed years and a key word for loan type
 # that returns a set of disclsoure data for that type of record_id andyears
 #setwd('/Users/prnathe/Documents/github_data/')
+
 read_data<- function(years,loan_type){
+  packages <- c("dplyr", "stringi")
+  suppressPackageStartupMessages(invisible(lapply(packages, library, character.only = TRUE)))
   #### helper functions ####
   get_widths <- function(year) {
     #short_year <- [1] %% 100L
