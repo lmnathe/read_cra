@@ -9,46 +9,34 @@
 #overview
 # create a function that you feed years and a key word for loan type
 # that returns a set of disclsoure data for that type of record_id andyears
-setwd('/Users/prnathe/Documents/github_data/')
-
-#### helper functions ####
-get_widths <- function(year) {
-  #short_year <- [1] %% 100L
-  
-  if (year == "96") {
-    ret_val <- c(4, 10, 1, 4, 1, 1, 2, 3, 4, 4,
-                 1, 1, 1, 3, 3, 6, 8, 6, 8, 6,
-                 8, 6, 8, 6, 8)
-  } else if (year %in% (c("97","98","99","00","01","03"))) {
-    ret_val <- c(5, 10, 1, 4, 1, 1, 2, 3, 4, 4,
-                 1, 1, 1, 3, 3, 6, 8, 6, 8, 6,
-                 8, 6, 8, 6, 8)
-  } else {
-    ret_val <- c(5, 10, 1, 4, 1, 1, 2, 3, 5, 4,
-                 1, 1, 1, 3, 3, 10, 10, 10, 10, 10,
-                 10, 10, 10, 10, 10)
-  }
-  
-  ret_val
-}
-factor_agency <- function(x) {
-  x <- as.character(x)
-  
-  factor(x,
-         levels = c('1', '2', '3', '4'),
-         labels = c('OCC', 'FRB', 'FDIC', 'OTS'))
-}
-
-
-
-#select years
-years<-c(1998,1999)
-#years<list(years)
-years<-c(1996,2015,2016)
-years<- as.character(years)
-loan_type<-"D11"
-
+#setwd('/Users/prnathe/Documents/github_data/')
 read_data<- function(years,loan_type){
+  #### helper functions ####
+  get_widths <- function(year) {
+    #short_year <- [1] %% 100L
+    if (year == "96") {
+      ret_val <- c(4, 10, 1, 4, 1, 1, 2, 3, 4, 4,
+                   1, 1, 1, 3, 3, 6, 8, 6, 8, 6,
+                   8, 6, 8, 6, 8)
+    } else if (year %in% (c("97","98","99","00","01","03"))) {
+      ret_val <- c(5, 10, 1, 4, 1, 1, 2, 3, 4, 4,
+                   1, 1, 1, 3, 3, 6, 8, 6, 8, 6,
+                   8, 6, 8, 6, 8)
+    } else {
+      ret_val <- c(5, 10, 1, 4, 1, 1, 2, 3, 5, 4,
+                   1, 1, 1, 3, 3, 10, 10, 10, 10, 10,
+                   10, 10, 10, 10, 10)
+    }
+    ret_val
+  }
+  factor_agency <- function(x) {
+    x <- as.character(x)
+    
+    factor(x,
+           levels = c('1', '2', '3', '4'),
+           labels = c('OCC', 'FRB', 'FDIC', 'OTS'))
+  }
+  years<- as.character(years)
   #convert years to format of urls 
   if(sum(nchar(years,type = "width")==4)==length(years)){
     years<- substr(years,3,4)
@@ -60,6 +48,8 @@ read_data<- function(years,loan_type){
   
   if(!loan_type %in% c("D3","D4","D5","D6","D11","D12","D21","D22")){
     print("You need to enter the proper loan type identifier!")
+  }
+  if(loan_type %in% c("D3","D4","D5","D6","D11","D12","D21","D22")){
     loan_var_name<-loan_type
     stri_sub(loan_var_name, 3, 2)
     stri_sub(loan_var_name, 3,2) <- "-"
@@ -82,7 +72,7 @@ for(y in 1:length(years)){
     unzip(zipfile = paste0("discl",years[y],".zip"))
     file.rename(paste0("cra20",years[y],"_Discl_",loan_type,".dat"), paste0(years[y],
                                                                             "exp_discl.dat"))
-  } else {
+    } else {
       unzip(zipfile = paste0("discl",years[y],".zip"))
       file_list<- list.files(pattern = "^exp_discl.dat")
       #file.rename("exp_discl.dat", paste0(years[y], "exp_discl.dat"))
@@ -92,17 +82,18 @@ for(y in 1:length(years)){
     y<-y+1
 }
 file_keep<- list.files(pattern = "..exp_discl.dat" )
-file_all<- list.files(pattern = "*.dat")
-file_remove<-setdiff(x = file_all, y = file_keep)
+file_dta<- list.files(pattern = "*.dat")
+file_zip<- list.files(pattern = "*.zip")
+file_remove<-setdiff(x = file_dta, y = file_keep)
 file.remove(file_remove)
-}
 
 #read in dat files    
 dat_name<-list.files(pattern = "*.dat")
 y<-1
 cra_full<- data.frame()
 for(y in 1:length(years)){
-w <- get_widths(years[y]) # Widths by file year
+#w <- get_widths(years[y]) # Widths by file year
+w <- get_widths(substr(dat_name[y],1,2)) # Widths by file year
 s <- cumsum(c(1, w))[1:length(w)] # starting point for each variable
 e <- cumsum(w)                    # end point for each variable
 
@@ -110,14 +101,6 @@ e <- cumsum(w)                    # end point for each variable
     in_tbl <- readr::read_lines(dat_name[y],progress = FALSE) %>%
       tibble::tibble(V1 = .) %>%
      filter(substr(V1, 1, 4) == loan_var_name)  
-    
-    # keep if IncomeGroup_Total == "0"
-    # replace IncomeGroup_Total = ""
-    # keep if inlist(Report_Level, "040","050","060")
-    # sort Respondent_ID State County Report_Level
-    # quietly by Respondent_ID State County:  gen dup = cond(_N==1,0,_n)
-    # drop if dup>1
-    # replace Report_Level = "040"
     
     ret_dt <- mutate(in_tbl,
                      respondent = as.numeric(substr(V1, s[2], e[2])),
@@ -181,14 +164,13 @@ e <- cumsum(w)                    # end point for each variable
                      num_affiliate = as.numeric(substr(V1, s[24], e[24])),
                      amt_affiliate = as.numeric(substr(V1, s[25], e[25]))) 
     
-    if (years[y] %in% c("96","97","98")){
+    if (substr(dat_name[y],1,2) %in% c("96","97","98")){
       ret_dt<- ret_dt %>% filter(is.na(income_group) & report_level %in%
                                    c('County Total',
                                      'Total Inside AA in County',
                                      'Total Outside AA in County'))
-      ret_dt<- ret_dt[order(ret_dt$respondent,ret_dt$state,ret_dt$county),]
-      #ret_dt<- ret_dt %>% distinct(respondent,state,county) # need to find a way to drop duplicates like stata
-      #ret_dt <- ret_dt[duplicated(ret_dt, by = c("respondent","state","county")),]
+      ret_dt<- ret_dt[order(ret_dt$respondent,ret_dt$state,ret_dt$county, ret_dt$report_level),]
+      ret_dt<- ret_dt %>% distinct(respondent,state,county,.keep_all = TRUE) # need to find a way to drop duplicates like stata
       ret_dt$report_level<- "County Total"
     }
     
@@ -196,14 +178,7 @@ e <- cumsum(w)                    # end point for each variable
     cra_full<- bind_rows(cra_full,ret_dt)
     y<-y+1
 }
-
-}  
-    
-
-    
-
-
-
-
-
-
+file.remove(file_dta)
+file.remove(file_zip)
+return(cra_full)
+}
