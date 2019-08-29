@@ -58,52 +58,129 @@ read_data<- function(years,loan_type){
     stri_sub(loan_var_name, 3,2) <- "-"
   }  
   # set something to convert these codes to the codes in the dat file 
-### download the data
-root<-"https://www.ffiec.gov/CRA/xls/"
-dest<-getwd()
-y<-1
-#loop through years
-for(y in 1:length(years)){
+  ### download the data
+  root<-"https://www.ffiec.gov/CRA/xls/"
+  dest<-getwd()
+  y<-1
+  #loop through years
+  for(y in 1:length(years)){
     download.file(paste0(root,years[y],"exp_discl.zip"),
                   destfile = paste0(dest,"/discl",
-                             years[y],".zip"))
-  y<-y+1
-}
-y<-1
-for(y in 1:length(years)){
-  if(years[y] %in% c("16","17","18")){
-    unzip(zipfile = paste0("discl",years[y],".zip"))
-    file.rename(paste0("cra20",years[y],"_Discl_",loan_type,".dat"), paste0(years[y],
-                                                                            "exp_discl.dat"))
+                                    years[y],".zip"))
+    y<-y+1
+  }
+  y<-1
+  for(y in 1:length(years)){
+    if(years[y] %in% c("16","17","18")){
+      unzip(zipfile = paste0("discl",years[y],".zip"))
+      file.rename(paste0("cra20",years[y],"_Discl_",loan_type,".dat"), paste0(years[y],
+                                                                              "exp_discl.dat"))
     } else {
       unzip(zipfile = paste0("discl",years[y],".zip"))
       file_list<- list.files(pattern = "^exp_discl.dat")
-      #file.rename("exp_discl.dat", paste0(years[y], "exp_discl.dat"))
       file.rename(from = file_list[1], paste0(years[y], "exp_discl.dat"))
       file.remove("exp_discl.dat")
     }
     y<-y+1
-}
-file_keep<- list.files(pattern = "..exp_discl.dat" )
-file_dta<- list.files(pattern = "*.dat")
-file_zip<- list.files(pattern = "*.zip")
-file_remove<-setdiff(x = file_dta, y = file_keep)
-file.remove(file_remove)
-
-#read in dat files    
-dat_name<-list.files(pattern = "*.dat")
-y<-1
-cra_full<- data.frame()
-for(y in 1:length(years)){
-#w <- get_widths(years[y]) # Widths by file year
-w <- get_widths(substr(dat_name[y],1,2)) # Widths by file year
-s <- cumsum(c(1, w))[1:length(w)] # starting point for each variable
-e <- cumsum(w)                    # end point for each variable
-
-
+  }
+  file_keep<- list.files(pattern = "..exp_discl.dat" )
+  file_dta<- list.files(pattern = "*.dat")
+  file_zip<- list.files(pattern = "*.zip")
+  file_remove<-setdiff(x = file_dta, y = file_keep)
+  file.remove(file_remove)
+  
+  ###download the transmittal files
+  y<-1
+  #if year ==1996 need to download 1997 and rename it to 1996
+  
+  #loop through years
+  for(y in 1:length(years)){
+    if(years[y] %in% c("96")){
+      download.file(paste0(root,"97exp_trans.zip"),destfile = paste0(dest,"/96exp_trans.zip"))
+      y<-y+1 
+    }else{
+      download.file(paste0(root,years[y],"exp_trans.zip"),
+                    destfile = paste0(dest,"/discl",
+                                      years[y],".zip"))
+      y<-y+1
+    }
+  }
+  
+  import_transmittal_file <- function(year) {
+    year<- as.numeric(year)
+    zip_name <- sprintf('%02dexp_trans.zip', year %% 100)
+    if(year %in% c(96)){
+      download.file(paste0(root,"97exp_trans.zip"),destfile = paste0(dest,"/96exp_trans.zip"))
+      file_list <- unzip(zip_name, list = TRUE)
+      
+      in_chr <- unz(zip_name, file_list$Name[[1]]) %>%
+        readr::read_lines(progress = FALSE) %>%
+        stringr::str_replace('\xb6', 'O') %>%  # This code appears in at least one archive
+        stringr::str_pad(width = 152, side = 'right')
+      
+      tibble::tibble(respondent = as.numeric(substr(in_chr, 1, 10)),
+                     agency = factor_agency(substr(in_chr, 11, 11)),
+                     year = as.numeric(substr(in_chr, 12, 15)),
+                     respondent_name = substr(in_chr, 16, 45),
+                     respondent_address = substr(in_chr, 46, 85),
+                     respondent_city = substr(in_chr, 86, 110),
+                     respondent_state = substr(in_chr, 111, 112),
+                     respondent_zip = substr(in_chr, 113, 122),
+                     tax_id = substr(in_chr, 123, 132),
+                     id_rssd = stringr::str_trim(substr(in_chr, 133, 142)),
+                     assets = as.numeric(substr(in_chr, 143, 152))) %>%
+        mutate(id_rssd = ifelse(id_rssd == '',
+                                -1 * ((respondent * 10) + as.numeric(agency)),
+                                as.numeric(id_rssd)),
+               year= 1996)
+    }
+    else{
+      download.file(paste0(root,year,"exp_trans.zip"),
+                    destfile = paste0(dest,"/",year,"exp_trans",
+                                      ".zip"))
+      
+      file_list <- unzip(zip_name, list = TRUE)
+      
+      in_chr <- unz(zip_name, file_list$Name[[1]]) %>%
+        readr::read_lines(progress = FALSE) %>%
+        stringr::str_replace('\xb6', 'O') %>%  # This code appears in at least one archive
+        stringr::str_pad(width = 152, side = 'right')
+      
+      tibble::tibble(respondent = as.numeric(substr(in_chr, 1, 10)),
+                     agency = factor_agency(substr(in_chr, 11, 11)),
+                     year = as.numeric(substr(in_chr, 12, 15)),
+                     respondent_name = substr(in_chr, 16, 45),
+                     respondent_address = substr(in_chr, 46, 85),
+                     respondent_city = substr(in_chr, 86, 110),
+                     respondent_state = substr(in_chr, 111, 112),
+                     respondent_zip = substr(in_chr, 113, 122),
+                     tax_id = substr(in_chr, 123, 132),
+                     id_rssd = stringr::str_trim(substr(in_chr, 133, 142)),
+                     assets = as.numeric(substr(in_chr, 143, 152))) %>%
+        mutate(id_rssd = ifelse(id_rssd == '',
+                                -1 * ((respondent * 10) + as.numeric(agency)),
+                                as.numeric(id_rssd)))
+    }
+    
+  }
+  
+  #read in dat files    
+  dat_name<-list.files(pattern = "*.dat")
+  y<-1
+  cra_full<- data.frame()
+  for(y in 1:length(years)){
+    #w <- get_widths(years[y]) # Widths by file year
+    w <- get_widths(substr(dat_name[y],1,2)) # Widths by file year
+    s <- cumsum(c(1, w))[1:length(w)] # starting point for each variable
+    e <- cumsum(w)                    # end point for each variable
+    
+    
     in_tbl <- readr::read_lines(dat_name[y],progress = FALSE) %>%
       tibble::tibble(V1 = .) %>%
-     filter(substr(V1, 1, 4) == loan_var_name)  
+      filter(substr(V1, 1, 4) == loan_var_name)  
+    
+    idrssd_map <- import_transmittal_file(years[y])
+    
     
     ret_dt <- mutate(in_tbl,
                      respondent = as.numeric(substr(V1, s[2], e[2])),
@@ -165,7 +242,9 @@ e <- cumsum(w)                    # end point for each variable
                      num_sbl = as.numeric(substr(V1, s[22], e[22])),
                      amt_sbl = as.numeric(substr(V1, s[23], e[23])),
                      num_affiliate = as.numeric(substr(V1, s[24], e[24])),
-                     amt_affiliate = as.numeric(substr(V1, s[25], e[25]))) 
+                     amt_affiliate = as.numeric(substr(V1, s[25], e[25]))) %>%
+      left_join(idrssd_map, by = 'respondent') %>%
+      select(-V1)
     
     if (substr(dat_name[y],1,2) %in% c("96","97","98")){
       ret_dt<- ret_dt %>% filter(is.na(income_group) & report_level %in%
@@ -180,8 +259,13 @@ e <- cumsum(w)                    # end point for each variable
     ret_dt<- ret_dt %>% filter(report_level == "County Total")
     cra_full<- bind_rows(cra_full,ret_dt)
     y<-y+1
+  }
+  file_zip<- list.files(pattern = "*.zip")
+  file.remove(file_dta)
+  file.remove(file_zip)
+  return(cra_full)
 }
-file.remove(file_dta)
-file.remove(file_zip)
-return(cra_full)
-}
+
+years<-1996
+
+test<-read_data(c(1996,1997),"D11")
