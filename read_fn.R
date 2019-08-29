@@ -265,7 +265,3 @@ read_data<- function(years,loan_type){
   file.remove(file_zip)
   return(cra_full)
 }
-
-years<-1996
-
-test<-read_data(c(1996,1997),"D11")
