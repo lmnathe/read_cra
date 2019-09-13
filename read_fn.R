@@ -21,7 +21,7 @@ read_data<- function(years,loan_type){
       ret_val <- c(4, 10, 1, 4, 1, 1, 2, 3, 4, 4,
                    1, 1, 1, 3, 3, 6, 8, 6, 8, 6,
                    8, 6, 8, 6, 8)
-    } else if (year %in% (c("97","98","99","00","01","03"))) {
+    } else if (year %in% (c("97","98","99","00","01","02","03"))) {
       ret_val <- c(5, 10, 1, 4, 1, 1, 2, 3, 4, 4,
                    1, 1, 1, 3, 3, 6, 8, 6, 8, 6,
                    8, 6, 8, 6, 8)
@@ -75,40 +75,37 @@ read_data<- function(years,loan_type){
       unzip(zipfile = paste0("discl",years[y],".zip"))
       file.rename(paste0("cra20",years[y],"_Discl_",loan_type,".dat"), paste0(years[y],
                                                                               "exp_discl.dat"))
-    } else {
+ 
+    }
+    if(years[y] %in% c("06")){
+      unzip(zipfile = paste0("discl",years[y],".zip"))
+      file_list<- list.files(pattern = "*exp_discl_new.dat")
+      file.rename(from = file_list[1], paste0(years[y], "exp_discl.dat"))
+ 
+    } 
+    else {
       unzip(zipfile = paste0("discl",years[y],".zip"))
       file_list<- list.files(pattern = "^exp_discl.dat")
       file.rename(from = file_list[1], paste0(years[y], "exp_discl.dat"))
-      file.remove("exp_discl.dat")
+
     }
     y<-y+1
   }
   file_keep<- list.files(pattern = "..exp_discl.dat" )
   file_dta<- list.files(pattern = "*.dat")
   file_zip<- list.files(pattern = "*.zip")
-  file_remove<-setdiff(x = file_dta, y = file_keep)
-  file.remove(file_remove)
+  #file_remove<-setdiff(x = file_dta, y = file_keep)
+  #file.remove(file_remove)
   
   ###download the transmittal files
   y<-1
   #if year ==1996 need to download 1997 and rename it to 1996
-  
-  #loop through years
-  for(y in 1:length(years)){
-    if(years[y] %in% c("96")){
-      download.file(paste0(root,"97exp_trans.zip"),destfile = paste0(dest,"/96exp_trans.zip"))
-      y<-y+1 
-    }else{
-      download.file(paste0(root,years[y],"exp_trans.zip"),
-                    destfile = paste0(dest,"/discl",
-                                      years[y],".zip"))
-      y<-y+1
-    }
-  }
+
   
   import_transmittal_file <- function(year) {
     year<- as.numeric(year)
     zip_name <- sprintf('%02dexp_trans.zip', year %% 100)
+    zip_name_download<-sprintf('%02dexp_trans.zip', year %% 100)
     if(year %in% c(96)){
       download.file(paste0(root,"97exp_trans.zip"),destfile = paste0(dest,"/96exp_trans.zip"))
       file_list <- unzip(zip_name, list = TRUE)
@@ -135,9 +132,8 @@ read_data<- function(years,loan_type){
                year= 1996)
     }
     else{
-      download.file(paste0(root,year,"exp_trans.zip"),
-                    destfile = paste0(dest,"/",year,"exp_trans",
-                                      ".zip"))
+      download.file(paste0(root,sprintf('%02dexp_trans.zip', year %% 100)),
+                                    destfile = paste0(dest,"/",sprintf('%02dexp_trans.zip', year %% 100)))
       
       file_list <- unzip(zip_name, list = TRUE)
       
@@ -243,10 +239,10 @@ read_data<- function(years,loan_type){
                      amt_sbl = as.numeric(substr(V1, s[23], e[23])),
                      num_affiliate = as.numeric(substr(V1, s[24], e[24])),
                      amt_affiliate = as.numeric(substr(V1, s[25], e[25]))) %>%
-      left_join(idrssd_map, by = 'respondent') %>%
-      select(-V1)
+      left_join(idrssd_map, by = c('respondent','year','agency')) %>%
+      dplyr::select(-V1)
     
-    if (substr(dat_name[y],1,2) %in% c("96","97","98")){
+    if (substr(dat_name[y],1,2) %in% c("96","97","98","99")){
       ret_dt<- ret_dt %>% filter(is.na(income_group) & report_level %in%
                                    c('County Total',
                                      'Total Inside AA in County',
