@@ -9,8 +9,8 @@
 #overview
 # create a function that you feed years and a key word for loan type
 # that returns a set of disclsoure data for that type of record_id andyears
-#setwd('/Users/prnathe/Documents/github_data/')
-
+#setwd('/Users/prnathe/Documents/github_data/') 
+# SET YOUR WORKING DIRECTORY SO AS TO NOT ACCIDENTALLY DELETE ANY CRA* FILES
 read_data<- function(years,loan_type){
   packages <- c("dplyr", "stringi")
   suppressPackageStartupMessages(invisible(lapply(packages, library, character.only = TRUE)))
@@ -261,3 +261,14 @@ read_data<- function(years,loan_type){
   file.remove(file_zip)
   return(cra_full)
 }
+ 
+# test<- test %>% mutate(c_fips = state*10000+county)
+# 
+# 
+# state_county<- test %>% group_by(year,state,county,c_fips) %>% 
+#   summarise(no_loans = sum(num_sbl,na.rm = T),
+#             ao_loans = sum(amt_sbl,na.rm = T),
+#             no_loans_gt100k = sum(num_100to250k,num_250to1m,na.rm = T),
+#             ao_loans_gt100k = sum(amt_100to250k,amt_250to1m,na.rm = T))
+# 
+# write.dta(state_county,"small_farm_2017.dta")
